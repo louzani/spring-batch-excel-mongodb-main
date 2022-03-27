@@ -1,0 +1,26 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb+srv://test:test1234@cluster0.mjxsy.mongodb.net/TESTSPRINGBATCH?retryWrites=true&w=majority
+
+
+
+  jackson:
+    default-property-inclusion: NON_NULL
+#disabled job run at startup
+  batch:
+    job:
+      enabled: false
+
+# Enable Logging mongo queries
+logging:
+  level:
+    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
+
+employee:
+  excel:
+    processingfolder: data/processing/
+    resultsfolder: data/results/
+search:
+  folder: C:\\files\\
+  pattern: trade*.json
