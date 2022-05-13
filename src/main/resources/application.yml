@@ -1,9 +1,4 @@
 spring:
-  data:
-    mongodb:
-
-
-
   jackson:
     default-property-inclusion: NON_NULL
 #disabled job run at startup
@@ -12,9 +7,6 @@ spring:
       enabled: false
 
 # Enable Logging mongo queries
-logging:
-  level:
-    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
 
 employee:
   excel:

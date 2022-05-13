@@ -1,21 +1,23 @@
-.package com.springbatch.excel.tutorial;
+package com.springbatch.excel.tutorial;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.springbatch.excel.tutorial.batch.JsonWriter;
 import com.springbatch.excel.tutorial.batch.processors.DocumentProcessor;
 import com.springbatch.excel.tutorial.domain.DataJson;
 import com.springbatch.excel.tutorial.domain.DataJsonOut;
+import com.springbatch.excel.tutorial.partitioner.JsonPartitioner;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.partition.PartitionHandler;
-import org.springframework.batch.core.partition.support.MultiResourcePartitioner;
 import org.springframework.batch.core.partition.support.TaskExecutorPartitionHandler;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.file.MultiResourceItemReader;
+import org.springframework.batch.item.file.builder.MultiResourceItemReaderBuilder;
 import org.springframework.batch.item.json.JacksonJsonObjectReader;
 import org.springframework.batch.item.json.JsonItemReader;
 import org.springframework.batch.item.json.builder.JsonItemReaderBuilder;
@@ -30,9 +32,7 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 
 @Configuration
 @EnableBatchProcessing
@@ -43,8 +43,6 @@ public class ReadMultiFileJob {
     @Autowired
     private StepBuilderFactory stepBuilderFactory;
 
-    @Value("file:c://files//trade*.json")
-    private Resource[] resources;
 
     @Value("file:c://files//trade*.json")
     private String locationResource;
@@ -64,13 +62,18 @@ public class ReadMultiFileJob {
     @Bean("partitionStep")
     public Step partitionStep() throws JsonProcessingException {
         return stepBuilderFactory.get("partitionStep")
-                .partitioner("step1", partitioner())
-                .partitionHandler(partitionHandler(stepBuilderFactory))
-                .step(step1())
-                .taskExecutor(taskExecutor())
+                .partitioner("step1",partitioner())
+                .partitionHandler(partitionHandler())
                 .build();
     }
 
+    @Bean("partitionerStep")
+
+    public JsonPartitioner partitioner() {
+        return new JsonPartitioner();
+    }
+
+/*
     @Bean("partitionerStep")
     public MultiResourcePartitioner partitioner() {
         MultiResourcePartitioner partitioner
@@ -80,6 +83,7 @@ public class ReadMultiFileJob {
         try {
             Resource[] resources = resolver.getResources(locationResource);
             partitioner.setResources(resources);
+            partitioner.partition(10);
             return partitioner;
         } catch (IOException e) {
             throw new RuntimeException("I/O problems when resolving"
@@ -87,28 +91,43 @@ public class ReadMultiFileJob {
         }
 
     }
+*/
 
-    @Bean("taskExecutorStep2")
+   @Bean("taskExecutorStep2")
     public TaskExecutor taskExecutor() {
-        SimpleAsyncTaskExecutor simpleAsyncTaskExecutor = new SimpleAsyncTaskExecutor();
-        simpleAsyncTaskExecutor.setConcurrencyLimit(5);
-        return simpleAsyncTaskExecutor;
+        return new SimpleAsyncTaskExecutor();
     }
 
+
+
+/*    @Bean("taskThExecutor")
+    TaskExecutor taskThExecutor () {
+        ThreadPoolTaskExecutor t = new ThreadPoolTaskExecutor();
+        t.setCorePoolSize(10);
+        t.setMaxPoolSize(100);
+        t.setQueueCapacity(50);
+        t.setAllowCoreThreadTimeOut(true);
+        t.setKeepAliveSeconds(120);
+        return t;
+    }*/
+
     @Bean("partitionHandlerstep2")
-    public PartitionHandler partitionHandler(StepBuilderFactory stepBuilderFactory) throws JsonProcessingException {
+    public PartitionHandler partitionHandler() throws JsonProcessingException {
         final TaskExecutorPartitionHandler handler = new TaskExecutorPartitionHandler();
-        handler.setGridSize(5);
         handler.setTaskExecutor(taskExecutor());
+        handler.setGridSize(3);
         handler.setStep(step1());
+
         return handler;
     }
 
 
-    @Bean
+
+
+    @Bean("step1")
     public Step step1() {
         return stepBuilderFactory.get("step1").<DataJson, DataJsonOut>chunk(10)
-                .reader(multiResourceItemReader())
+                .reader(multiResourceItemReader(null,null))
                 .processor(processor())
                 .writer(consolJsonWrite()).build();
     }
@@ -120,15 +139,47 @@ public class ReadMultiFileJob {
     }
 
 
-    @Bean
-    public MultiResourceItemReader<DataJson> multiResourceItemReader() {
-        MultiResourceItemReader<DataJson> resourceItemReader = new MultiResourceItemReader<DataJson>();
-        resourceItemReader.setResources(resources);
-        resourceItemReader.setDelegate(reader());
-        return resourceItemReader;
+    @Bean("multiResourceItemReader")
+    @StepScope
+    public MultiResourceItemReader<DataJson> multiResourceItemReader(@Value("#{stepExecutionContext['fromId']}") Integer fromId,
+                                                                     @Value("#{stepExecutionContext['toId']}") Integer toId){
+
+        ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        Resource[] resources = new Resource[0];
+        try {
+            resources = resolver.getResources(locationResource);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        Resource[] partitionedResources = Arrays.copyOfRange(resources,fromId,toId+1);
+
+        return  new MultiResourceItemReaderBuilder<DataJson>()
+                    .delegate(reader())
+                    .name("itemReader")
+                   .resources(partitionedResources).build();
+      
     }
 
+/*
     @Bean
+    public MultiResourceItemReader<DataJson> multiResourceItemReader() {
+
+
+        ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        Resource[] resources ;
+        MultiResourceItemReader<DataJson> resourceItemReader = new MultiResourceItemReader<DataJson>();
+
+        try {
+            resources = resolver.getResources(locationResource);
+            resourceItemReader.setResources(resources);
+            resourceItemReader.setDelegate(reader());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return resourceItemReader;
+    }*/
+
+    @Bean("reader")
     public JsonItemReader<DataJson> reader() {
         JsonItemReader<DataJson> delegate = new JsonItemReaderBuilder<DataJson>()
                 .jsonObjectReader(new JacksonJsonObjectReader<>(DataJson.class))
@@ -137,7 +188,7 @@ public class ReadMultiFileJob {
         return delegate;
     }
 
-    public static void main(String[] args) {
+  /*  public static void main(String[] args) {
         for (int i = 0; i <1000 ; i++) {
             try{
             String name = "c://files//trade"+i+".json";
@@ -146,5 +197,5 @@ public class ReadMultiFileJob {
             System.out.println(e.toString());
         }
         }
-    }
+    }*/
 }
