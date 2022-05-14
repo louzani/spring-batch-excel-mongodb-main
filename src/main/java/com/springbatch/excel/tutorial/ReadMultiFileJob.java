@@ -21,6 +21,7 @@ import org.springframework.batch.item.file.builder.MultiResourceItemReaderBuilde
 import org.springframework.batch.item.json.JacksonJsonObjectReader;
 import org.springframework.batch.item.json.JsonItemReader;
 import org.springframework.batch.item.json.builder.JsonItemReaderBuilder;
+import org.springframework.batch.item.support.SynchronizedItemStreamReader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -30,6 +31,7 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.annotation.Async;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -127,9 +129,11 @@ public class ReadMultiFileJob {
     @Bean("step1")
     public Step step1() {
         return stepBuilderFactory.get("step1").<DataJson, DataJsonOut>chunk(10)
-                .reader(multiResourceItemReader(null,null))
+                .reader(multiResourceItemReader(null))
                 .processor(processor())
-                .writer(consolJsonWrite()).build();
+                .writer(consolJsonWrite())
+                .throttleLimit(3)
+                .build();
     }
 
 
@@ -140,23 +144,23 @@ public class ReadMultiFileJob {
 
 
     @Bean("multiResourceItemReader")
+    @Async
     @StepScope
-    public MultiResourceItemReader<DataJson> multiResourceItemReader(@Value("#{stepExecutionContext['fromId']}") Integer fromId,
-                                                                     @Value("#{stepExecutionContext['toId']}") Integer toId){
+    public MultiResourceItemReader<DataJson> multiResourceItemReader(@Value("#{stepExecutionContext['lot']}") Integer lot){
 
         ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         Resource[] resources = new Resource[0];
         try {
-            resources = resolver.getResources(locationResource);
+            resources = resolver.getResources("file:c://files//"+lot+"//trade*.json");
         } catch (IOException e) {
             e.printStackTrace();
         }
-        Resource[] partitionedResources = Arrays.copyOfRange(resources,fromId,toId+1);
 
         return  new MultiResourceItemReaderBuilder<DataJson>()
                     .delegate(reader())
                     .name("itemReader")
-                   .resources(partitionedResources).build();
+                    .setStrict(true)
+                   .resources(resources).build();
       
     }
 
@@ -179,14 +183,31 @@ public class ReadMultiFileJob {
         return resourceItemReader;
     }*/
 
+
     @Bean("reader")
-    public JsonItemReader<DataJson> reader() {
+    public JsonItemReader<DataJson>
+
+    reader() {
+        JsonItemReader<DataJson> delegate = new JsonItemReaderBuilder<DataJson>()
+                .jsonObjectReader(new JacksonJsonObjectReader<>(DataJson.class))
+                .name("documentItemReader")
+                .strict(true)
+                .build();
+        return delegate;
+    }
+
+
+/*
+    @Bean
+    public SynchronizedItemStreamReader<DataJson> itemReader() {
+        SynchronizedItemStreamReader<DataJson> synchronizedItemStreamReader = new SynchronizedItemStreamReader<>();
         JsonItemReader<DataJson> delegate = new JsonItemReaderBuilder<DataJson>()
                 .jsonObjectReader(new JacksonJsonObjectReader<>(DataJson.class))
                 .name("documentItemReader")
                 .build();
-        return delegate;
-    }
+        synchronizedItemStreamReader.setDelegate(delegate);
+        return synchronizedItemStreamReader;
+    }*/
 
   /*  public static void main(String[] args) {
         for (int i = 0; i <1000 ; i++) {

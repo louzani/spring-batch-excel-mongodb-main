@@ -35,13 +35,10 @@ public class JsonPartitioner implements Partitioner{
 
             ExecutionContext context = new ExecutionContext();
             partitionMap.put(String.valueOf(1), context);
-            context.putInt("fromId", 0);
-            context.putInt("toId", 2);
-
+            context.putInt("lot", 1);
            ExecutionContext context2 = new ExecutionContext();
             partitionMap.put(String.valueOf(2), context2);
-            context2.putInt("fromId", 3);
-            context2.putInt("toId", 5);
+            context2.putInt("lot", 2);
 
         } catch (IOException e) {
             e.printStackTrace();
