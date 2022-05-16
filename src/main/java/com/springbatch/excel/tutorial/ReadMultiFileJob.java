@@ -15,9 +15,14 @@ import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.partition.PartitionHandler;
 import org.springframework.batch.core.partition.support.TaskExecutorPartitionHandler;
+import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.MultiResourceItemReader;
 import org.springframework.batch.item.file.builder.MultiResourceItemReaderBuilder;
+import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
+import org.springframework.batch.item.file.mapping.DefaultLineMapper;
+import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.batch.item.json.JacksonJsonObjectReader;
 import org.springframework.batch.item.json.JsonItemReader;
 import org.springframework.batch.item.json.builder.JsonItemReaderBuilder;
@@ -132,7 +137,6 @@ public class ReadMultiFileJob {
                 .reader(multiResourceItemReader(null))
                 .processor(processor())
                 .writer(consolJsonWrite())
-                .throttleLimit(3)
                 .build();
     }
 
@@ -144,7 +148,6 @@ public class ReadMultiFileJob {
 
 
     @Bean("multiResourceItemReader")
-    @Async
     @StepScope
     public MultiResourceItemReader<DataJson> multiResourceItemReader(@Value("#{stepExecutionContext['lot']}") Integer lot){
 
@@ -155,15 +158,27 @@ public class ReadMultiFileJob {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
         return  new MultiResourceItemReaderBuilder<DataJson>()
-                    .delegate(reader())
-                    .name("itemReader")
-                    .setStrict(true)
-                   .resources(resources).build();
-      
+                .delegate(reader())
+                .name("itemReader")
+                .resources(resources).build();
     }
 
+     /*   @Bean
+        @StepScope
+        public FlatFileItemReader<DataJson> readerCsv() {
+            FlatFileItemReader<DataJson> reader = new FlatFileItemReader<DataJson>();
+            reader.setLineMapper(new DefaultLineMapper() {{
+                setLineTokenizer(new DelimitedLineTokenizer() {{
+                    setNames(new String[]{"id", "name"});
+                }});
+
+                setFieldSetMapper(new BeanWrapperFieldSetMapper<DataJson>() {{
+                    setTargetType(DataJson.class);
+                }});
+            }});
+            return reader;
+        }*/
 /*
     @Bean
     public MultiResourceItemReader<DataJson> multiResourceItemReader() {
@@ -185,9 +200,8 @@ public class ReadMultiFileJob {
 
 
     @Bean("reader")
-    public JsonItemReader<DataJson>
-
-    reader() {
+    @StepScope
+    public JsonItemReader<DataJson> reader() {
         JsonItemReader<DataJson> delegate = new JsonItemReaderBuilder<DataJson>()
                 .jsonObjectReader(new JacksonJsonObjectReader<>(DataJson.class))
                 .name("documentItemReader")

@@ -24,25 +24,21 @@ public class JsonPartitioner implements Partitioner{
     private String locationResource;
 
     @Override
-    public Map<String, ExecutionContext> partition(int gridSize) {
+    public Map<String, ExecutionContext> partition(int gridSize)  {
         Map<String, ExecutionContext> partitionMap = new HashMap<String, ExecutionContext>();
         ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-        try {
-            Resource[] resources = resolver.getResources(locationResource);
-
+        /*    Resource[] resources = resolver.getResources(locationResource);
+https://mkyong.com/spring-batch/spring-batch-partitioning-example/
            int d = resources.length / gridSize;
+*/
 
+        ExecutionContext context = new ExecutionContext();
+        partitionMap.put(String.valueOf(1), context);
+        context.putInt("lot", 1);
+        ExecutionContext context2 = new ExecutionContext();
+        partitionMap.put(String.valueOf(2), context2);
+        context2.putInt("lot", 2);
 
-            ExecutionContext context = new ExecutionContext();
-            partitionMap.put(String.valueOf(1), context);
-            context.putInt("lot", 1);
-           ExecutionContext context2 = new ExecutionContext();
-            partitionMap.put(String.valueOf(2), context2);
-            context2.putInt("lot", 2);
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
         LOGGER.info("END : Created Partitions of size: "+partitionMap.size());
         return partitionMap;
     }

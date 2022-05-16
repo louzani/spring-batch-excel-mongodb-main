@@ -4,7 +4,7 @@ spring:
 #disabled job run at startup
   batch:
     job:
-      enabled: false
+      enabled: true
 
 # Enable Logging mongo queries
 

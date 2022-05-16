@@ -36,7 +36,7 @@ public class MultiFilesJobLauncher {
     }
 
     // run every 2 min
-    @Scheduled(fixedRate = 30000)
+ //   @Scheduled(fixedRate = 300000000)
     void launchFileToJob() throws JobParametersInvalidException, JobExecutionAlreadyRunningException, JobInstanceAlreadyCompleteException, JobRestartException {
         LOGGER.info("Starting job");
 
